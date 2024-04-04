@@ -1,0 +1,44 @@
+Vagrant.configure("2") do |config|
+    # Указываем ОС, версию, количество ядер и ОЗУ
+    config.vm.box = "generic/centos8s"
+    config.vm.provider :virtualbox do |v|
+      v.memory = 2048
+      v.cpus = 1
+    end
+
+    # Разворачиваем IPA-сервер
+    vm_ipa = [
+      { :name => "ipa.otus.lan",
+        :ip => "192.168.57.10",
+      }
+    ]
+    vm_ipa.each do |opts|
+      config.vm.define opts[:name] do |config|
+        config.vm.hostname = opts[:name]
+        config.vm.network "private_network", ip: opts[:ip]
+        config.vm.provision "shell", path: "ipa_provision.sh"
+      end
+    end
+
+    # Разворачиваем IPA-клиентов
+    vm_client = [
+      { :name => "client1.otus.lan",
+        :ip => "192.168.57.11",
+      },
+      { :name => "client2.otus.lan",
+        :ip => "192.168.57.12",
+      }
+    ]
+    vm_client.each do |opts|
+      config.vm.define opts[:name] do |config|
+        config.vm.hostname = opts[:name]
+        config.vm.network "private_network", ip: opts[:ip]
+        config.vm.provision "shell", inline: <<-SHELL
+          sudo sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+          systemctl restart sshd
+        SHELL
+      end
+    end
+
+  end
+
